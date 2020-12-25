@@ -41,9 +41,12 @@
         text-color="#eee"
         @select="handleSelect">
         <el-menu-item index="1">
-          <el-button size="mini" @click="onPreviw(false)">预览</el-button>
+          <el-button size="mini" @click="$router.push('/three')">三维模型描点</el-button>
         </el-menu-item>
         <el-menu-item index="2">
+          <el-button size="mini" @click="onPreviw(false)">预览</el-button>
+        </el-menu-item>
+        <el-menu-item index="3">
           <el-button size="mini" @click="onPreviw(true)">示例预览</el-button>
         </el-menu-item>
       </el-menu>

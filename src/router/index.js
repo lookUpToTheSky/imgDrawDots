@@ -14,6 +14,16 @@ const routes = [
     path: '/preview',
     name: 'Preview',
     component: () => import(/* webpackChunkName: "preview" */ '../views/preview.vue')
+  },
+  {
+    path: '/three',
+    name: 'Three',
+    component: () => import(/* webpackChunkName: "Three" */ '../views/three.vue')
+  },
+  {
+    path: '/previewThree',
+    name: 'PreviewThree',
+    component: () => import(/* webpackChunkName: "Three" */ '../views/previewThree.vue')
   }
 ]
 
