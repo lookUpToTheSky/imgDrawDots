@@ -65,7 +65,7 @@
   </section>
   <!-- 图片描点区域center -->
   <section class="center-draw-dots"
-    @drop="ondropEnd" 
+    @drop="ondropEnd(null)" 
     @dragenter="dragenter"
     @dragover="preventDefault">
     <div v-if="imageSrc" id="draw-dots-image">
@@ -176,7 +176,7 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
   export default {
     data() {
       return {
-        drawDotsJson: {
+        sceneData: {
           image: '',
           width: 0,
           height: 0,
@@ -237,7 +237,7 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
       },
       onDelteData() {
         this.imageSrc = '';
-        this.drawDotsJson = null;
+        this.sceneData = null;
       },
       // 点击显示菜单
       onShowMenu(pos) {
@@ -334,36 +334,19 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
           this.userData = '';
         }
       },
-      getBase64ToBlob(blob) {
-          var fileReader = new FileReader();
-          fileReader.readAsDataURL(imageSrc);
-          fileReader.onload = function (e) { 
-            console.log(e.target.result); 
-          }
-      },
       getJson() {
-         scene.children.forEach((item, i) => {
-            if(Object.keys(item.userData).length > 0) {
-              this.drawDotsJson.data.push({...item.userData});
-            }
-         })
-         console.log(this.drawDotsJson.data)
-        const blobData = new Blob([JSON.stringify(this.drawDotsJson)], {type: 'text/json'});
+        this.sceneData.data = [];
+        scene.children.forEach((item, i) => {
+          if(Object.keys(item.userData).length > 0) {
+            this.sceneData.data.push({...item.userData});
+          }
+        })
+        const blobData = new Blob([JSON.stringify(this.sceneData)], {type: 'text/json'});
         var link = document.createElement('a');
         link.download = `dots_${Math.floor(Math.random(0, 10)*Math.pow(10, 8))}.json`;
         link.href = URL.createObjectURL(blobData);
         link.click();
       },
-      getBase64Image(img) {  
-        var canvas = document.createElement("canvas");  
-        canvas.width = img.width;  
-        canvas.height = img.height;  
-        var ctx = canvas.getContext("2d");  
-        ctx.drawImage(img, 0, 0, img.width, img.height);  
-        var ext = img.src.substring(img.src.lastIndexOf(".")+1).toLowerCase();  
-        var dataURL = canvas.toDataURL("image/"+ext);  
-        return dataURL;  
-      },  
       // 选择点
       onDropStart(item) {
         this.selectedNode = item;
@@ -375,13 +358,15 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
         event.preventDefault();
       },
       ondropEnd() {
+        let pos = {};
+        pos = this.getModeXYZ(event.offsetX, event.offsetY);
+        pos = {x: pos.x, y: pos.y, z: 0}
         if(!!this.selectedNode.node) {
           let material = new THREE.MeshPhongMaterial( {color: this.selectedNode.color} );
           let mesh = new THREE.Mesh( new THREE[this.selectedNode.node](...this.selectedNode.argument), material)
           this.activeElement = mesh;
-          this.setNodePostion(event);
+          this.setNodePostion(pos, this.selectedNode, this.activeElement);
         }else{
-          let dragEvent = event;
           this.loadObjmtl(this.selectedNode.fileName, this.selectedNode.fileName).then((obj) => {
             let box = new BoxHelper(obj, 0x00dd95);
             let mesh = new THREE.Mesh(box.geometry, new THREE.MeshBasicMaterial({transparent: true, opacity: 0}));
@@ -392,33 +377,32 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
             this.activeElement.scale.x *= this.selectedNode.argument[0];
             this.activeElement.scale.y *= this.selectedNode.argument[1];
             this.activeElement.scale.z *= this.selectedNode.argument[2];
-            this.setNodePostion(dragEvent);
+            this.setNodePostion(pos, this.selectedNode, this.activeElement);
           });
         }
       },
-      setNodePostion(e) {
+      setNodePostion(pos, selectedNode, element) {
         let that = this;
-        let pos = this.getModeXYZ(e.offsetX, e.offsetY);
-        this.activeElement.position.set(pos.x, pos.y, 0);
-        this.activeElement.userData = {
-          id: this.activeElement.uuid,
+        element.position.set(pos.x, pos.y, pos.z);
+        element.userData = {
+          ...selectedNode,
+          id:element.uuid,
           dragable: true,
-          name: this.activeElement.name,
-          position: this.activeElement.position,
-          scale: this.activeElement.scale,
-          rotation: this.activeElement.rotation,
-          ...this.selectedNode
+          name:element.name,
+          position:element.position,
+          scale:element.scale,
+          rotation:element.rotation,
         }
-        scene.add(this.activeElement);
-        transformControls.attach(this.activeElement)
+        scene.add(element);
+        transformControls.attach(element);
         let activeElement = null;
-        activeElement = this.activeElement.isBoxHelper? this.activeElement.helperModle : this.activeElement;
+        activeElement = !element.isBoxHelper ? element.helperModle : element;
         activeElement.on('click', (() => {
-          let node = that.activeElement;
+          let node = element;
           return function() {
-            transformControls.detach(that.activeElement);
-            that.activeElement = node
-            if(node.userData.dragable) transformControls.attach(that.activeElement);
+            transformControls.detach(element);
+            element = node
+            if(node.userData.dragable) transformControls.attach(element);
             that.onShowMenu({x: event.offsetX, y: event.offsetY});
           }
         })())
@@ -438,12 +422,13 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
           return pos;
       },
       onPreviw(type) {
-         scene.children.forEach((item, i) => {
-           if(Object.keys(item.userData).length > 0) {
-             this.drawDotsJson.data.push(item.userData)
-           }
-         })
-        this.$store.commit('setDotsData', this.drawDotsJson);
+        this.sceneData.data = [];
+        scene.children.forEach((item, i) => {
+          if(Object.keys(item.userData).length > 0) {
+            this.sceneData.data.push({...item.userData});
+          }
+        })
+        this.$store.commit('setSceneData', this.sceneData);
         this.$router.push({name: 'PreviewThree', params: {show: type}});
       },
 			initThreeScene() {
@@ -481,7 +466,6 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
                 })
             })
         })
-					
       },
       // 添加拖拽控件
       initDragControls() {
@@ -507,12 +491,58 @@ import { BoxGeometry, BoxHelper, MeshPhongMaterial } from 'three'
 				this.animationId = requestAnimationFrame(this.animation);
 				renderer.render(scene,camera)
         controls.update();
-			}
+      },
+      // 渲染场景数据
+      renderScene() {
+        let arr = this.sceneData.data.filter( item => item.fileName);
+        arr = arr.map( item => item.fileName);
+        arr = new Set(arr);
+        let loadModle = [];
+        let account = 0;
+        arr.forEach((item, i) => {
+          this.loadObjmtl(item, item + i).then((obj) => {
+            loadModle.push({modle: obj, fileName: item});
+            account++;
+            if(account === arr.size) {
+                this.sceneData.data.forEach((item, i) => {
+                    if(item.scale) {
+                      this.selectedNode = item;
+                      if(!!item.node) {
+                        let material = new THREE.MeshPhongMaterial( {color: item.color} );
+                        let mesh = new THREE.Mesh( new THREE[item.node](...item.argument), material)
+                        this.activeElement = mesh;
+                        this.setNodePostion(item.position, item, this.activeElement);
+                      }else{
+                        let obj = loadModle.filter( child => child.fileName == item.fileName)[0].modle.clone();
+                        let box = new BoxHelper(obj, 0x00dd95);
+                        let mesh = new THREE.Mesh(box.geometry, new THREE.MeshBasicMaterial({transparent: true, opacity: 0}));
+                        scene.add(obj);
+                        mesh.isBoxHelper = true;
+                        mesh.helperModle = obj;
+                        this.activeElement = mesh;
+                        this.activeElement.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                        this.activeElement.position.set(item.position.x, item.position.y, item.position.z);
+                        this.activeElement.rotation.set(item.rotation.x, item.rotation.y, item.rotation.z);
+                        obj.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                        obj.position.set(item.position.x, item.position.y, item.position.z);
+                        obj.rotation.set(item.rotation.x, item.rotation.y, item.rotation.z);
+                        this.setNodePostion(item.position, item, mesh);
+                      }
+                    }
+                })
+              }
+          })
+        })
+      }
     },
     mounted() {
       this.initThreeScene();
       this.initDragControls();
       this.animation();
+      if(!!this.$store.state.sceneData) {
+        this.sceneData = this.$store.state.sceneData;
+        this.renderScene();
+      }
 			window.onresize = () => {
 					camera.aspect = this.viewNode.clientWidth / this.viewNode.clientHeight//相机重置可视范围
 					camera.updateProjectionMatrix();

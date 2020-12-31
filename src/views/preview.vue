@@ -58,7 +58,7 @@
     }else {
       this.drawDotsJson = this.$store.state.dotsData;
       this.$nextTick(() => {
-        this.initDots();
+        this.initDots(); 
       })
       window.onresize = () => {
         this.initDots();

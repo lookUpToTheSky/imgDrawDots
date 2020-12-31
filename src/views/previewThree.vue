@@ -17,7 +17,7 @@ export default {
    name: 'preview',
    data () {
      return {
-       drawDotsJson: null,
+       sceneData: null,
        viewNode: '',
        animationId: ''
      }
@@ -63,15 +63,14 @@ export default {
                     })
                 })
             })
-            
         },
         animation() {
             this.animationId = requestAnimationFrame(this.animation);
             renderer.render(scene,camera)
             controls.update();
         },
-        renderScene() {
-            return new Promise((resovle, reject) => {
+        getSceneData() {
+          return new Promise((resovle, reject) => {
             let request = new XMLHttpRequest();
             request.open('get', './points.json');
             request.send();
@@ -82,25 +81,10 @@ export default {
                     reject()
                 }
             };
-            })
-      }
-   },
-  mounted() {
-    this.initThreeScene();
-    this.animation();
-    // this.loadObjmtl('shanpo', '').then((obj) => {
-    //     scene.add(obj)
-    // });
-    window.onresize = () => {
-        camera.aspect = this.viewNode.clientWidth / this.viewNode.clientHeight//相机重置可视范围
-        camera.updateProjectionMatrix();
-        renderer.setSize( this.viewNode.clientWidth , this.viewNode.clientHeight );//渲染器重新渲染可视范围
-        THREE.onEvent(scene, camera, this.viewNode, this.viewNode.clientWidth, this.viewNode.clientHeight);
-    }
-    if(this.$route.params.show) {
-      this.renderScene().then(res => {
-        this.drawDotsJson = res;
-        let arr = res.data.filter( item => item.fileName);
+          })
+      },
+      renderScene() {
+        let arr = this.sceneData.data.filter( item => item.fileName);
         arr = arr.map( item => item.fileName);
         arr = new Set(arr);
         let loadModle = [];
@@ -110,7 +94,7 @@ export default {
             loadModle.push({modle: obj, fileName: item});
             account++;
             if(account === arr.size) {
-                res.data.forEach((item) => {
+                this.sceneData.data.forEach((item) => {
                     if(item.scale) {
                       let modle = null
                       if(!item.fileName){ 
@@ -127,18 +111,28 @@ export default {
                       scene.add(mesh);
                     }
                 })
-            }
+              }
           })
         })
+      }
+   },
+  mounted() {
+    this.initThreeScene();
+    this.animation();
+    window.onresize = () => {
+        camera.aspect = this.viewNode.clientWidth / this.viewNode.clientHeight//相机重置可视范围
+        camera.updateProjectionMatrix();
+        renderer.setSize( this.viewNode.clientWidth , this.viewNode.clientHeight );//渲染器重新渲染可视范围
+        THREE.onEvent(scene, camera, this.viewNode, this.viewNode.clientWidth, this.viewNode.clientHeight);
+    }
+    if(this.$route.params.show) {
+      this.getSceneData().then(res => {
+        this.sceneData = res;
+        this.renderScene();
       })
     }else {
-    //   this.drawDotsJson = this.$store.state.dotsData;
-    //   this.$nextTick(() => {
-    //     this.initDots();
-    //   })
-    //   window.onresize = () => {
-    //     this.initDots();
-    //   }
+      this.sceneData = this.$store.state.sceneData;
+      this.renderScene();
     }
   },
   //注销window.onresize事件
